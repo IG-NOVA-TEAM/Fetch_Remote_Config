@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Remote Config Debugger</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface: rgba(15, 23, 42, 0.6);
+            --surface-solid: #1e293b;
+            --primary: #38bdf8;
+            --primary-hover: #0284c7;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* --- Animated Background Orbs --- */
+        .bg-orbs {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            overflow: hidden;
+            z-index: -1;
+            background: #0f172a;
+        }
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.5;
+            animation: float 20s infinite ease-in-out;
+        }
+        .orb-1 {
+            top: -10%; left: -10%;
+            width: 50vw; height: 50vw;
+            background: #38bdf8;
+            animation-delay: 0s;
+        }
+        .orb-2 {
+            bottom: -20%; right: -10%;
+            width: 60vw; height: 60vw;
+            background: #4f46e5;
+            animation-delay: -5s;
+            animation-duration: 25s;
+        }
+        .orb-3 {
+            top: 40%; left: 50%;
+            width: 40vw; height: 40vw;
+            background: #c026d3;
+            animation-delay: -10s;
+            animation-duration: 22s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #38bdf8, #818cf8, #e879f9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 40px;
+            text-align: center;
+            letter-spacing: -1px;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .container {
+            background-color: var(--surface);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            padding: 40px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+            width: 100%;
+            max-width: 650px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input {
+            padding: 14px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background-color: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s;
+            font-family: 'Fira Code', monospace;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25), inset 0 2px 4px rgba(0,0,0,0.2);
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        button.main-btn {
+            background: linear-gradient(135deg, #0ea5e9 0%, #4f46e5 100%);
+            color: white;
+            font-weight: 700;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+            margin-top: 10px;
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        button.main-btn:hover {
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 12px 25px rgba(79, 70, 229, 0.5);
+            background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
+        }
+
+        button.main-btn:active {
+            transform: translateY(0);
+        }
+
+        button.main-btn:disabled {
+            background: #334155;
+            color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Result Area */
+        .result-container {
+            margin-top: 50px;
+            width: 100%;
+            max-width: 1400px;
+            background-color: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+            display: none;
+            overflow: hidden;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .result-header {
+            background: linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0.1));
+            padding: 18px 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-title {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 16px;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btns button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            margin-left: 10px;
+            transition: all 0.2s;
+        }
+
+        .action-btns button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        /* JSON Tree Styling */
+        .json-tree {
+            padding: 30px;
+            overflow-x: auto;
+            font-family: 'Fira Code', Consolas, monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            max-height: 75vh;
+            overflow-y: auto;
+        }
+
+        /* Scrollbar custom */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        details { display: block; }
+        
+        details > summary { 
+            list-style-type: none; 
+            cursor: pointer;
+            outline: none;
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 4px;
+            margin-left: -4px;
+            border-radius: 4px;
+        }
+        
+        details > summary::-webkit-details-marker { display: none; }
+        
+        summary::before {
+            content: '▶';
+            display: inline-block;
+            width: 16px;
+            font-size: 10px;
+            color: #64748b;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        details[open] > summary::before {
+            transform: rotate(90deg);
+        }
+
+        summary:hover {
+            background-color: rgba(255,255,255,0.08);
+        }
+
+        .indent {
+            margin-left: 20px;
+            border-left: 1px dashed rgba(255,255,255,0.15);
+            padding-left: 14px;
+        }
+
+        .line {
+            margin-top: 2px;
+            margin-bottom: 2px;
+        }
+
+        /* Syntax Colors */
+        .k { color: #86efac; font-weight: 500; } /* Key */
+        .v-str { color: #93c5fd; } /* String */
+        .v-num { color: #fca5a5; } /* Number */
+        .v-bool { color: #fdba74; font-weight: 600; } /* Boolean */
+        .v-null { color: #94a3b8; font-style: italic; } /* Null */
+        .count { font-size: 0.85em; color: #64748b; margin-left: 8px; font-family: 'Inter', sans-serif;}
+
+        /* Error state */
+        .error-message {
+            padding: 24px;
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.15);
+            border-left: 4px solid #ef4444;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        
+        .loading-text {
+            color: var(--primary);
+            padding: 40px 24px;
+            text-align: center;
+            font-weight: 500;
+            font-size: 16px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Animated Background -->
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <h1>✨ Remote Config Debugger</h1>
+    
+    <div class="container">
+        <div class="form-group">
+            <label for="apiKey">🔑 Web API Key</label>
+            <input type="text" id="apiKey" placeholder="AIzaSy..." spellcheck="false">
+        </div>
+        
+        <div class="form-group">
+            <label for="projectId">📁 Project ID</label>
+            <input type="text" id="projectId" placeholder="my-firebase-project" spellcheck="false">
+        </div>
+        
+        <div class="form-group">
+            <label for="appId">📱 Android App ID</label>
+            <input type="text" id="appId" placeholder="1:123456789:android:abcdef" spellcheck="false">
+        </div>
+
+        <div class="form-group">
+            <label for="packageName">📦 Package Name</label>
+            <input type="text" id="packageName" placeholder="com.example.myapp" spellcheck="false">
+        </div>
+        
+        <button id="fetchBtn" class="main-btn" onclick="fetchRemoteConfig()">🚀 Fetch JSON Config</button>
+    </div>
+
+    <!-- JSON Viewer Container -->
+    <div class="result-container" id="resultContainer">
+        <div class="result-header">
+            <div class="result-title" id="resultTitle">Fetch Result</div>
+            <div class="action-btns" id="actionBtns" style="display: none;">
+                <button onclick="toggleAll(true)">⤓ Mở rộng tất cả</button>
+                <button onclick="toggleAll(false)">⤒ Thu gọn tất cả</button>
+            </div>
+        </div>
+        <div class="json-tree" id="jsonTree">
+            <!-- Rendered JSON will go here -->
+        </div>
+    </div>
+
+    <script>
+        // --- JSON TREE GENERATOR ---
+        function escapeHtml(unsafe) {
+            return unsafe
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function generateJsonTree(data) {
+            if (data === null) return '<span class="v-null">null</span>';
+            if (typeof data === 'boolean') return `<span class="v-bool">${data}</span>`;
+            if (typeof data === 'number') return `<span class="v-num">${data}</span>`;
+            if (typeof data === 'string') {
+                if ((data.startsWith('{') && data.endsWith('}')) || (data.startsWith('[') && data.endsWith(']'))) {
+                    try {
+                        const parsed = JSON.parse(data);
+                        return `<span class="v-str">"</span>` + generateJsonTree(parsed) + `<span class="v-str">"</span>`;
+                    } catch(e) {}
+                }
+                return `<span class="v-str">"${escapeHtml(data)}"</span>`;
+            }
+            
+            if (Array.isArray(data)) {
+                if (data.length === 0) return '[]';
+                let html = `<details open><summary><span class="arr-summary">[ <span class="count">${data.length} items</span> ]</span></summary><div class="indent">`;
+                data.forEach((val, i) => {
+                    html += `<div class="line">` + generateJsonTree(val) + (i < data.length - 1 ? ',' : '') + `</div>`;
+                });
+                html += `</div>]</details>`;
+                return html;
+            }
+            
+            if (typeof data === 'object') {
+                const keys = Object.keys(data);
+                if (keys.length === 0) return '{}';
+                let html = `<details open><summary><span class="obj-summary">{ <span class="count">${keys.length} keys</span> }</span></summary><div class="indent">`;
+                keys.forEach((key, i) => {
+                    html += `<div class="line"><span class="k">"${escapeHtml(key)}"</span>: ` + generateJsonTree(data[key]) + (i < keys.length - 1 ? ',' : '') + `</div>`;
+                });
+                html += `</div>}</details>`;
+                return html;
+            }
+            return '';
+        }
+
+        function toggleAll(expand) {
+            const details = document.querySelectorAll('#jsonTree details');
+            details.forEach(detail => {
+                if (expand) {
+                    detail.setAttribute('open', '');
+                } else {
+                    detail.removeAttribute('open');
+                }
+            });
+        }
+
+        // --- FETCH LOGIC ---
+        async function fetchRemoteConfig() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const projectId = document.getElementById('projectId').value.trim();
+            const appId = document.getElementById('appId').value.trim();
+            const packageName = document.getElementById('packageName').value.trim();
+            
+            const btn = document.getElementById('fetchBtn');
+            const resultContainer = document.getElementById('resultContainer');
+            const resultTitle = document.getElementById('resultTitle');
+            const actionBtns = document.getElementById('actionBtns');
+            const jsonTree = document.getElementById('jsonTree');
+
+            if (!apiKey || !projectId || !appId || !packageName) {
+                alert("Vui lòng nhập đầy đủ các trường thông tin!");
+                return;
+            }
+
+            // Reset UI state
+            btn.disabled = true;
+            btn.textContent = "⏳ Đang kết nối Firebase...";
+            resultContainer.style.display = 'block';
+            actionBtns.style.display = 'none';
+            resultTitle.innerHTML = "⚡ Trạng thái";
+            resultTitle.style.color = "#38bdf8";
+            
+            jsonTree.innerHTML = `<div class="loading-text">Bước 1: Đang xin cấp Installation Token...</div>`;
+
+            try {
+                const installUrl = `https://firebaseinstallations.googleapis.com/v1/projects/${projectId}/installations`;
+                const installRes = await fetch(installUrl, {
+                    method: 'POST',
+                    headers: {
+                        'x-goog-api-key': apiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        appId: appId,
+                        authVersion: 'FIS_v2',
+                        sdkVersion: 'a:21.2.0'
+                    })
+                });
+
+                if (!installRes.ok) {
+                    const errText = await installRes.text();
+                    throw new Error(`Lỗi Installations API (Bước 1):\nHTTP ${installRes.status}\n${errText}`);
+                }
+
+                const installData = await installRes.json();
+                const fid = installData.fid;
+                const authToken = installData.authToken.token;
+
+                jsonTree.innerHTML = `<div class="loading-text">Thành công Bước 1 (FID: ${fid}).<br>Bước 2: Đang tải Remote Config...</div>`;
+                btn.textContent = "⏳ Đang tải dữ liệu...";
+
+                const configUrl = `https://firebaseremoteconfig.googleapis.com/v1/projects/${projectId}/namespaces/firebase:fetch`;
+                const configBody = {
+                    app_instance_id: fid,
+                    app_instance_id_token: authToken,
+                    app_id: appId,
+                    package_name: packageName,
+                    app_version: "1.0",
+                    language_code: "en",
+                    country_code: "US"
+                };
+
+                const configRes = await fetch(configUrl, {
+                    method: 'POST',
+                    headers: {
+                        'x-goog-api-key': apiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(configBody)
+                });
+
+                if (!configRes.ok) {
+                    const errText = await configRes.text();
+                    throw new Error(`Lỗi Remote Config API (Bước 2):\nHTTP ${configRes.status}\n${errText}`);
+                }
+
+                const configData = await configRes.json();
+                
+                resultTitle.innerHTML = "✅ Remote Config Data";
+                resultTitle.style.color = "#10b981"; // Success Green
+                actionBtns.style.display = 'block';
+                
+                jsonTree.innerHTML = generateJsonTree(configData);
+
+            } catch (error) {
+                resultTitle.innerHTML = "❌ Lỗi kết nối";
+                resultTitle.style.color = "#ef4444"; // Error Red
+                
+                let errorHtml = `<div class="error-message">${escapeHtml(error.message)}</div>`;
+                
+                if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+                    errorHtml += `
+                        <div class="error-message" style="margin-top: 15px; background: rgba(245, 158, 11, 0.15); border-left-color: #f59e0b; color: #fcd34d;">
+                            <strong>⚠️ CẢNH BÁO CORS (Cross-Origin):</strong><br>
+                            Rất có thể request bị trình duyệt chặn do chính sách bảo mật của Google.<br><br>
+                            <strong>Giải pháp:</strong><br>
+                            1. Cài đặt tiện ích mở rộng <b>"Allow CORS: Access-Control-Allow-Origin"</b> trên Chrome/Edge.<br>
+                            2. Bật tiện ích đó lên (biểu tượng chuyển màu chữ C sang cam/xanh).<br>
+                            3. Nhấn Fetch lại.
+                        </div>`;
+                }
+                jsonTree.innerHTML = errorHtml;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "🚀 Fetch JSON Config";
+            }
+        }
+    </script>
+</body>
+</html>
